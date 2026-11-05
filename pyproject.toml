@@ -1,0 +1,144 @@
+[project]
+name = "DigitalHematology"
+version = "0.1.0"
+description = "For Hematology Based on Template for daily research experiments"
+readme = "README.md"
+requires-python = "==3.12.*"
+
+# ============================================================
+# Base — 分野を問わず使うものだけを置く。
+# 分野特化のものは下の [project.optional-dependencies] に置き、
+#   make uv_sync p=<partition> extras="llm chem"
+# で追加インストールする。
+# ============================================================
+dependencies = [
+    # --- テンプレート自身が使うもの ---
+    # pyyaml: templates/experiment.py が config.yml を読むのに使う（venv内で実行）。
+    #   シェル側（scripts/slurm_entry.sh・tools/cancel_job.sh）は
+    #   scripts/metadata.sh の printf 実装に統一してあるので PyYAML を必要としない。
+    "pyyaml",
+    "python-dotenv",
+    "psutil",
+    "tqdm",
+    "requests",
+
+    # --- Notebook ---
+    "jupyterlab",
+    "ipython",
+
+    # --- データ処理 ---
+    "numpy",
+    "pandas",
+    "polars",
+    "pyarrow",
+    "duckdb",
+    "scipy",
+
+    # --- 古典的機械学習・ハイパーパラメータ探索 ---
+    "scikit-learn",
+    "lightgbm",
+    # xgboost の GPU wheel は nvidia-nccl-cu13 (252MB) を要求するため、
+    # torch 側の nvidia-nccl-cu12 と NCCL が2系統入る。既知の許容コスト。
+    "xgboost",
+    "optuna",
+
+    # --- 可視化 ---
+    "matplotlib",
+    "seaborn",
+    "plotly",
+
+    # --- 深層学習（分野横断: GNN・タンパク質言語モデル・単一細胞解析など） ---
+    # CUDA は env/env.def のベースイメージと揃える（下の [[tool.uv.index]] 参照）。
+    # torch / torchvision / torchaudio はバージョンが連動するため3者まとめて
+    # 固定する（torch 2.11 ↔ torchvision 0.26 ↔ torchaudio 2.11）。
+    # 上げるときは3行同時に、かつ cu1XX を env/env.def のベースイメージと
+    # 合わせて変更すること。
+    "torch==2.11.0+cu128",
+    "torchvision==0.26.0+cu128",
+    "torchaudio==2.11.0+cu128",
+    "transformers",
+    "datasets",
+    "accelerate",
+    "tokenizers",
+    "safetensors",
+    "huggingface-hub",
+]
+
+# ============================================================
+# 分野特化の依存。`uv sync --extra <name>` で入る。
+# 入れない限りベース環境は汚れない。
+# ============================================================
+[project.optional-dependencies]
+
+# 血液塗抹標本からの白血球抽出
+# make uv_sync extras="hematology"でhematologyパッケージ群を一括インストール可能
+hematology = [
+    "pillow",
+    "opencv-python",
+    "openslide-python",
+    "openslide-bin",
+    "pyclustering",
+    "h5py",
+    "loguru",
+    "scikit-image",
+    "albumentations",
+    "segmentation-models-pytorch",
+    "ultralytics"
+]
+
+# LLM の推論・軽量学習。ケモ/バイオインフォの実験には不要。
+# vllm は単独で約88パッケージ・800MB超を引き込み、さらに
+# humming-kernels[cu13] / nvidia-cutlass-dsl[cu13] を要求するため、
+# cu128 に揃えた CUDA スタックに CUDA13 系カーネルが混ざる。
+llm = [
+    "vllm>=0.22.0",
+    "trl",
+    "peft",
+    "bitsandbytes",
+    "sentencepiece",
+    "evaluate",
+]
+
+# ケモインフォマティクス。
+# env/env.def 側に RDKit / OpenBabel のビルド依存
+# (libboost-all-dev / libcairo2-dev / swig / openbabel) が既に入っている。
+chem = [
+    "rdkit",
+]
+
+# 文献テキストマイニング（前身プロジェクト kg-with-pubmed 由来）。
+# scispacy が spacy<3.8 を強制するため、この extra を宣言すると
+# lock 全体で spacy が旧版に固定される点に注意。
+nlp = [
+    "spacy",
+    "scispacy",
+    "fast-langdetect",
+    "lxml",
+    "elasticsearch>=8.0.0,<9.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# lib をパッケージとして認識させる設定
+[tool.hatch.build.targets.wheel]
+packages = ["lib", "preprocessing", "segmentation"]
+## 岩坂さんに作っていただいたpreprocessing,segmentationを追記(Package内にどのフォルダをmoduleとして同梱するか指定する設定)
+## 独自のpyproject.tomlやsetup.pyを持たず外部の独立パッケージではないためこの追記方法
+## enan(=setup.pyを持つ外部の独立パッケージ)とは記法が異なる
+
+# pytorch index url
+# env/env.def のベースイメージ (nvidia/cuda:12.8.1-cudnn-devel) と CUDA の
+# メジャー・マイナーを揃えること。ここを変える場合は env.def 側も合わせて
+# 変更し、make build_env でイメージを作り直す。
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# strict pytorch to be installed from "pytorch-cu128"
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }

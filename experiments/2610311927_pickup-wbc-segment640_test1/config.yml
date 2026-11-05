@@ -1,0 +1,34 @@
+# ============================================================
+# 白血球パッチのYOLO形式書き出し(experiment.py)の設定
+# ============================================================
+
+# 入力: .tifファイル1枚、または.tifが入ったディレクトリ(直下の*.tifを全て処理)。
+# 相対パスはPROJECT_ROOT基準。
+input_path: data/testdata_to_nakagawa/s260325009260810246.tif
+
+
+# 出力先 outputs/2610311927_pickup-wbc-segment640_test1/<run_name>/ の名前。同じrun_nameで完了済みならジョブは何もせず終了する。
+# 設定を変えて回し直すときはrun_nameも変えること。
+run_name: v1_s260325009260810246
+
+patch_size: 640
+# 書き出すパッチ全体に占める陰性(検出0件)の割合。0以上1未満。
+negative_ratio: 0.15
+# png(劣化なし)またはjpg(quality=95)
+image_ext: png
+# 動作確認用: グリッドのマスからこの数だけ無作為に選んで処理する。nullなら全マス。
+max_candidates: 2000
+# 組織がこの割合以上写っているマスだけを対象にする
+min_coverage: 0.5
+downsample: 16
+seed: 0
+# 確認用プレビュー画像の枚数(スライドごと)
+n_previews: 20
+
+# detect_wbc_boxesの引数
+detector:
+  size: 30
+  blue_thresh: 180
+  red_thresh: 130
+  step: 10
+  min_box_size: 60
